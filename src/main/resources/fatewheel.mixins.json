@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.fatewheel.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "UpgraderMenuMixin",
+    "ItemValuesMixin"
+  ],
+  "client": [
+    "client.UpgraderScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "fatewheel:item/talisman_chain",
+    "layer1": "fatewheel:item/talisman_gem"
+  }
+}
