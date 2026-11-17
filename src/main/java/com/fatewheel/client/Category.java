@@ -18,24 +18,9 @@ import java.util.Set;
  * Предметы, которых нет в этой версии или которые в чёрном списке Upgrader, просто не показываются.
  */
 public enum Category {
-    FOOD("Еда", "cooked_beef",
-            "cooked_beef", "cooked_porkchop", "cooked_chicken", "cooked_mutton", "cooked_rabbit", "cooked_salmon",
-            "cooked_cod", "bread", "baked_potato", "golden_carrot", "golden_apple", "pumpkin_pie", "cake", "cookie",
-            "mushroom_stew", "rabbit_stew", "beetroot_soup", "honey_bottle", "apple", "carrot", "sweet_berries",
-            "glow_berries", "melon_slice", "dried_kelp", "chorus_fruit"),
-    DECOR("Декор", "flower_pot",
-            "flower_pot", "painting", "item_frame", "glow_item_frame", "lantern", "soul_lantern", "candle", "sea_lantern",
-            "glowstone", "shroomlight", "end_rod", "bookshelf", "chiseled_bookshelf", "decorated_pot", "armor_stand",
-            "white_banner", "red_bed", "quartz_block", "chiseled_quartz_block", "purpur_block", "prismarine_bricks",
-            "dark_prismarine", "white_glazed_terracotta", "light_blue_stained_glass", "tinted_glass", "mud_bricks",
-            "cherry_planks", "bamboo_mosaic", "moss_block", "azalea", "flowering_azalea", "poppy", "sunflower",
-            "lily_of_the_valley", "amethyst_cluster", "copper_bulb", "polished_blackstone_bricks", "pale_oak_planks"),
-    RESOURCES("Ресурсы", "iron_ingot",
-            "coal", "iron_ingot", "gold_ingot", "copper_ingot", "diamond", "emerald", "lapis_lazuli", "redstone",
-            "quartz", "amethyst_shard", "netherite_scrap", "netherite_ingot", "raw_iron", "raw_gold", "raw_copper",
-            "obsidian", "crying_obsidian", "blaze_rod", "ender_pearl", "slime_ball", "string", "leather", "bone",
-            "gunpowder", "glowstone_dust", "prismarine_shard", "oak_log", "cobblestone", "iron_block", "gold_block",
-            "diamond_block", "emerald_block", "experience_bottle"),
+    FOOD("Еда", "cooked_beef", FateItems.FOOD_IDS),
+    DECOR("Декор", "flower_pot", FateItems.DECOR_IDS),
+    RESOURCES("Ресурсы", "iron_ingot", FateItems.RESOURCE_IDS),
     UNIQUE("Уникальные", "nether_star", FateItems.UNIQUE_IDS),
     /** Предметы этого мода — список берётся из FateItems. */
     SPECIAL("Особые", "fatewheel:chronometer");

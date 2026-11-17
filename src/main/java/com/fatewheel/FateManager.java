@@ -539,6 +539,34 @@ public final class FateManager {
         sound(p, SoundEvents.PLAYER_LEVELUP, 1f, 1f);
     }
 
+    /** Итог Колеса судьбы. На «Ничего» ставка сгорела, на остальных секторах она цела. */
+    public static void announceFortune(ServerPlayer p, com.fatewheel.upgrader.Fortune.Tier tier, Component got,
+                                       String stakeText, boolean forever) {
+        boolean empty = tier == com.fatewheel.upgrader.Fortune.Tier.NOTHING;
+        if (!empty && got == null) got = Component.literal("Подходящего приза не нашлось.");
+        ChatFormatting color = empty ? ChatFormatting.DARK_GRAY
+                : switch (tier) {
+                    case JACKPOT -> ChatFormatting.LIGHT_PURPLE;
+                    case BIG -> ChatFormatting.GOLD;
+                    case LUCK -> ChatFormatting.YELLOW;
+                    default -> ChatFormatting.GREEN;
+                };
+        Component sub = empty ? Component.literal("Колесо забирает: " + stakeText).withStyle(ChatFormatting.RED)
+                : got.copy().withStyle(color);
+        title(p, Component.literal(tier.title.toUpperCase()).withStyle(color, ChatFormatting.BOLD), sub);
+        p.sendSystemMessage(Component.literal("[Колесо судьбы] " + tier.title + " (x" + tier.multiplier + ")").withStyle(color));
+        if (!empty) p.sendSystemMessage(got.copy().withStyle(color));
+        if (empty) {
+            p.sendSystemMessage(Component.literal((forever ? "Ставка ушла навсегда: " : "Ставка ушла: ") + stakeText)
+                    .withStyle(ChatFormatting.GRAY));
+        } else {
+            p.sendSystemMessage(Component.literal("Ставка остаётся при вас.").withStyle(ChatFormatting.GREEN));
+        }
+        if (tier == com.fatewheel.upgrader.Fortune.Tier.JACKPOT && !empty) sound(p, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+        else if (tier.multiplier >= 2 && !empty) sound(p, SoundEvents.PLAYER_LEVELUP, 1f, 1f);
+        else if (empty && forever) sound(p, SoundEvents.ELDER_GUARDIAN_CURSE, 0.6f, 1.2f);
+    }
+
     public static void announceLoss(ServerPlayer p, String lostText, boolean forever) {
         title(p, Component.literal("ПРОИГРЫШ").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD),
                 Component.literal("Вы теряете: " + lostText).withStyle(ChatFormatting.RED));

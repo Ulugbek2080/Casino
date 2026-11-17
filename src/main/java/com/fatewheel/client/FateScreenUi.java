@@ -4,7 +4,9 @@ import com.fatewheel.ClientFlags;
 import com.fatewheel.Stake;
 import com.fatewheel.network.FateSelectPayload;
 import com.fatewheel.upgrader.FateScreenAccess;
+import com.fatewheel.upgrader.Fortune;
 import com.fatewheel.upgrader.Mode;
+import com.fatewheel.upgrader.StakeSlots;
 import net.execheinz.upgrader.client.StyledButton;
 import net.execheinz.upgrader.client.WheelRenderer;
 import net.execheinz.upgrader.menu.UpgraderMenu;
@@ -76,15 +78,14 @@ public final class FateScreenUi {
     }
 
     public static void onInit() {
-        chooser = -1;
-        category = null;
-        page = 0;
+        chooser = -1; // выбранный режим и категория остаются с прошлого раза
         Category.resetCache();
     }
 
     private static List<Choice> rightChoices() {
         if (rightChoices == null) {
             List<Choice> c = new ArrayList<>();
+            c.add(new Choice("Колесо судьбы", new ItemStack(Items.FIREWORK_ROCKET), Mode.FORTUNE, null));
             c.add(new Choice("Все предметы", new ItemStack(Items.CHEST), Mode.ITEMS, null));
             for (Category cat : Category.values()) c.add(new Choice(cat.title, cat.icon(), Mode.ITEMS, cat));
             c.add(new Choice("Время", new ItemStack(Items.CLOCK), Mode.TIME, null));
@@ -149,14 +150,11 @@ public final class FateScreenUi {
     /** «ПРОКАЧАТЬ» активна и когда ставка/цель — время или органы; пресеты x2/30% — только для предметной цели. */
     public static void adjustButtons(UpgraderMenu menu, StyledButton upgrade, List<StyledButton> presets, boolean ready) {
         Mode in = mode(0), out = mode(1);
-        if (in == Mode.ITEMS && out == Mode.ITEMS) { // обычный Апгрейдер
-            if (upgrade != null && (categoryOpen() || chooser >= 0)) upgrade.active = false;
-            return;
-        }
         if (upgrade != null) {
-            boolean inOk = in == Mode.ITEMS ? !menu.getInputStack().isEmpty() : mask(0) != 0 && menu.getInputStack().isEmpty();
-            boolean outOk = out == Mode.ITEMS ? menu.getTarget() != null : mask(1) != 0;
-            upgrade.active = ready && inOk && outOk && chooser < 0;
+            // ставка предметами — любая из 5 ячеек; время/органы — только при пустых ячейках
+            boolean inOk = in == Mode.ITEMS ? !StakeSlots.empty(menu) : mask(0) != 0 && StakeSlots.empty(menu);
+            boolean outOk = out == Mode.ITEMS ? menu.getTarget() != null : out == Mode.FORTUNE || mask(1) != 0;
+            upgrade.active = ready && inOk && outOk && chooser < 0 && !categoryOpen();
         }
         if (out != Mode.ITEMS) for (StyledButton b : presets) b.active = false;
     }
@@ -197,6 +195,7 @@ public final class FateScreenUi {
             }
             if (chooser == side) {
                 for (Mode m : Mode.values()) {
+                    if (m == Mode.FORTUNE) continue; // колесо — только справа
                     if (in(mx, my, x1 + 8, chooserY(top, m), CARD_W - 16, 20)) {
                         if (m != mode(side)) setMode(side, m);
                         chooser = -1;
@@ -208,6 +207,7 @@ public final class FateScreenUi {
             }
             Mode m = mode(side);
             if (m == Mode.ITEMS) return false; // дальше — обычный Апгрейдер (ячейка, каталог, количество)
+            if (m == Mode.FORTUNE) return true; // в таблице колеса кликать нечего
             Stake hit = m == Mode.TIME ? timeAt(x1, top, mx, my) : bodyAt(x1, top, mx, my);
             if (hit != null) toggle(side, hit);
             return true;
@@ -230,6 +230,10 @@ public final class FateScreenUi {
                 cardBg(g, x1, top);
                 if (side == 1) renderRightChooser(g, font, x1, top, mx, my);
                 else renderChooser(g, font, x1, top, side, mx, my);
+            } else if (side == 1 && m == Mode.FORTUNE) {
+                cardBg(g, x1, top);
+                List<Component> tip = renderFortune(g, font, access, x1, top, mx, my);
+                if (tip != null) tooltip = tip;
             } else if (side == 1 && categoryOpen()) {
                 cardBg(g, x1, top);
                 List<Component> tip = renderCategory(g, font, screen, x1, top, mx, my);
@@ -244,6 +248,7 @@ public final class FateScreenUi {
             }
             renderPill(g, font, x1, top, side, m, mx, my);
         }
+        if (mode(1) == Mode.FORTUNE) renderFortuneWheel(g, access, left, top);
         if (tooltip != null) g.setTooltipForNextFrame(font, tooltip, Optional.empty(), mx, my);
     }
 
@@ -257,7 +262,7 @@ public final class FateScreenUi {
         int border = chooser == side ? GOLD : (hover ? TEXT_DIM : -13024934);
         WheelRenderer.card(g, px, py, px + pw, py + PILL_H, 3, border, -14275526, -14802130);
         boolean cat = side == 1 && categoryOpen();
-        String title = cat ? category.title : m.title;
+        String title = cat ? category.title : m == Mode.FORTUNE ? "Колесо" : m.title;
         g.centeredText(font, Component.literal(title + " ▾"), x1 + CARD_W / 2, py + 2, m == Mode.ITEMS && !cat ? TEXT_DIM : GOLD);
     }
 
@@ -269,6 +274,7 @@ public final class FateScreenUi {
         int cx = x1 + CARD_W / 2;
         g.centeredText(font, Component.literal(side == 0 ? "Что ставите?" : "Что хотите?"), cx, top + CARD_Y1 + 5, TEXT);
         for (Mode m : Mode.values()) {
+            if (m == Mode.FORTUNE) continue;
             int y = chooserY(top, m);
             boolean hover = in(mx, my, x1 + 8, y, CARD_W - 16, 20);
             boolean current = m == mode(side);
@@ -308,6 +314,121 @@ public final class FateScreenUi {
             g.item(c.icon, x + 3, y + 2);
         }
         g.centeredText(font, Component.literal(title), x1 + CARD_W / 2, top + CARD_Y1 + 5, TEXT);
+    }
+
+    // ------------------------------------------------------------------ Колесо судьбы
+
+    /** Центр и кольцо колеса Апгрейдера (UpgraderScreen: WHEEL_CX/CY, RING_IN/OUT). */
+    private static final float WHEEL_CX = 144f, WHEEL_CY = 70f, RING_IN = 30f, RING_OUT = 41f;
+
+    /** Секторы поверх кольца Апгрейдера; стрелка снаружи кольца, её не закрываем. */
+    /** Показываем результат последнего вращения (после остановки колеса, несколько секунд). */
+    private static Fortune.Tier shownResult(FateScreenAccess access) {
+        if (access.fatewheel$spinning() || System.currentTimeMillis() > ClientFlags.fortuneUntil) return null;
+        int t = ClientFlags.fortuneTier;
+        return t >= 0 && t < Fortune.Tier.values().length ? Fortune.Tier.values()[t] : null;
+    }
+
+    private static void renderFortuneWheel(GuiGraphicsExtractor g, FateScreenAccess access, int left, int top) {
+        float cx = left + WHEEL_CX, cy = top + WHEEL_CY;
+        Fortune.Tier result = shownResult(access);
+        WheelRenderer.arc(g, cx, cy, RING_IN - 0.5f, RING_OUT + 0.5f, 0f, 360f, 0xFF15171C); // фон — видны щели между секторами
+        for (int i = 0; i < Fortune.LAYOUT.length; i++) {
+            float from = Fortune.FROM[i], to = Fortune.TO[i];
+            float gap = Math.min(0.6f, (to - from) * 0.15f);
+            // arc(..., начало, длина дуги) — второй угол это размах, а не конец
+            int color = Fortune.LAYOUT[i].color;
+            if (result != null && Fortune.LAYOUT[i] != result) color = dim(color); // выпавший сектор горит, остальные гаснут
+            WheelRenderer.arc(g, cx, cy, RING_IN, RING_OUT, from + gap, to - from - gap * 2, color);
+        }
+    }
+
+    private static int fortuneRowY(int top, int i) {
+        return top + CARD_Y1 + 17 + i * 10;
+    }
+
+    private static List<Component> renderFortune(GuiGraphicsExtractor g, Font font, FateScreenAccess access,
+                                                 int x1, int top, int mx, int my) {
+        int cx = x1 + CARD_W / 2;
+        Fortune.Tier result = shownResult(access);
+        if (result != null) return renderFortuneResult(g, font, x1, top, result, mx, my);
+        long stake = access.fatewheel$inputValue();
+        List<Component> tip = null;
+        boolean titleHover = in(mx, my, x1 + 4, top + CARD_Y1 + 3, CARD_W - 8, 11);
+        g.centeredText(font, Component.literal("Колесо судьбы"), cx, top + CARD_Y1 + 5, GOLD);
+        if (titleHover) {
+            tip = List.of(Component.literal("Колесо судьбы").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                    Component.literal("«Ничего» — ставка сгорает.").withStyle(ChatFormatting.RED),
+                    Component.literal("Любой другой сектор — ставка остаётся").withStyle(ChatFormatting.GREEN),
+                    Component.literal("и вы получаете приз по его цене:").withStyle(ChatFormatting.GREEN),
+                    Component.literal("предмет или возврат потерянного.").withStyle(ChatFormatting.GRAY),
+                    Component.literal("2 из 3 вращений что-то приносят.").withStyle(ChatFormatting.DARK_GRAY));
+        }
+        Fortune.Tier[] tiers = Fortune.Tier.values();
+        for (int i = 0; i < tiers.length; i++) {
+            Fortune.Tier t = tiers[i];
+            int y = fortuneRowY(top, i);
+            boolean hover = in(mx, my, x1 + 4, y - 1, CARD_W - 8, 10);
+            if (hover) g.fill(x1 + 4, y - 1, x1 + CARD_W - 4, y + 9, 0x30FFFFFF);
+            g.fill(x1 + 7, y + 1, x1 + 13, y + 7, t.color);
+            g.text(font, Component.literal(t.title), x1 + 16, y, hover ? TEXT : TEXT_DIM, false);
+            String pct = t.percent + "%";
+            g.text(font, Component.literal(pct), x1 + CARD_W - 7 - font.width(pct), y, hover ? TEXT : TEXT_DIM, false);
+            if (hover) {
+                List<Component> lines = new ArrayList<>();
+                lines.add(Component.literal(t.title + " — " + t.percent + "%").withStyle(ChatFormatting.BOLD));
+                if (t == Fortune.Tier.NOTHING) {
+                    lines.add(Component.literal("Ставка сгорает, приза нет.").withStyle(ChatFormatting.RED));
+                } else {
+                    lines.add(Component.literal("Ставка остаётся + приз ≈ x" + t.multiplier).withStyle(ChatFormatting.GREEN));
+                    if (stake > 0) lines.add(Component.literal("Сейчас: ≈ " + format(Math.round(stake * t.multiplier)))
+                            .withStyle(ChatFormatting.YELLOW));
+                    if (t == Fortune.Tier.JACKPOT) lines.add(Component.literal("Сначала ищется уникальный или особый предмет.")
+                            .withStyle(ChatFormatting.LIGHT_PURPLE));
+                }
+                tip = lines;
+            }
+        }
+        return tip;
+    }
+
+    /** Итог вращения во всю карточку: сектор крупно, приз, что со ставкой. */
+    private static List<Component> renderFortuneResult(GuiGraphicsExtractor g, Font font, int x1, int top,
+                                                       Fortune.Tier tier, int mx, int my) {
+        int cx = x1 + CARD_W / 2, y0 = top + CARD_Y1;
+        boolean lost = tier == Fortune.Tier.NOTHING;
+        // мигающая рамка в цвет сектора
+        boolean blink = (System.currentTimeMillis() / 250) % 2 == 0;
+        outline(g, x1 + 2, y0 + 2, CARD_W - 4, CARD_Y2 - CARD_Y1 - 4, blink ? tier.color : dim(tier.color));
+
+        g.pose().pushMatrix();
+        g.pose().translate(cx, y0 + 8);
+        g.pose().scale(1.5f, 1.5f);
+        g.centeredText(font, Component.literal(lost ? "Ничего" : tier.title + "!"), 0, 0, lost ? TEXT_DIM : tier.color);
+        g.pose().popMatrix();
+        if (!lost) g.centeredText(font, Component.literal("x" + tier.multiplier), cx, y0 + 23, TEXT_DIM);
+
+        List<Component> tip = null;
+        ItemStack prize = ClientFlags.fortunePrize;
+        if (lost) {
+            g.centeredText(font, Component.literal("Ставка сгорела"), cx, y0 + 44, RED);
+        } else if (!prize.isEmpty()) {
+            int ix = cx - 8, iy = y0 + 35;
+            WheelRenderer.card(g, ix - 3, iy - 3, ix + 19, iy + 19, 3, tier.color, -14275526, -14802130);
+            g.item(prize, ix, iy);
+            g.itemDecorations(font, prize, ix, iy);
+            String name = prize.getHoverName().getString() + (prize.getCount() > 1 ? " x" + prize.getCount() : "");
+            g.centeredText(font, Component.literal(font.plainSubstrByWidth(name, CARD_W - 8)), cx, y0 + 57, TEXT);
+            if (in(mx, my, ix - 3, iy - 3, 22, 22)) tip = Screen.getTooltipFromItem(Minecraft.getInstance(), prize);
+        } else if (ClientFlags.fortuneRestore != 0) {
+            g.centeredText(font, Component.literal("Возвращено:"), cx, y0 + 38, GREEN);
+            List<String> titles = Stake.titles(ClientFlags.fortuneRestore);
+            g.centeredText(font, Component.literal(font.plainSubstrByWidth(String.join(", ", titles), CARD_W - 8)), cx, y0 + 50, TEXT);
+        } else {
+            g.centeredText(font, Component.literal("Приз не нашёлся"), cx, y0 + 44, TEXT_DIM);
+        }
+        if (!lost) g.centeredText(font, Component.literal("Ставка цела"), cx, y0 + 70, GREEN);
+        return tip;
     }
 
     // ------------------------------------------------------------------ категория: сетка 4x4 предметов
@@ -402,8 +523,8 @@ public final class FateScreenUi {
                                      FateScreenAccess access, int x1, int top, int side) {
         int cx = x1 + CARD_W / 2;
         int y = top + 92;
-        if (side == 0 && !screen.getMenu().getInputStack().isEmpty()) {
-            g.centeredText(font, Component.literal("Уберите предмет"), cx, y, RED);
+        if (side == 0 && !StakeSlots.empty(screen.getMenu())) {
+            g.centeredText(font, Component.literal("Уберите предметы"), cx, y, RED);
         } else if (mask(side) == 0) {
             g.centeredText(font, Component.literal(side == 0 ? "Отметьте ставку" : "Что вернуть?"), cx, y, TEXT_DIM);
         } else {
@@ -581,6 +702,7 @@ public final class FateScreenUi {
             } else {
                 lines.add(Component.literal("Ценность: " + format(s.value())).withStyle(ChatFormatting.YELLOW));
                 lines.add(Component.literal("Проигрыш — навсегда.").withStyle(ChatFormatting.DARK_RED));
+                lines.add(Component.literal("При выигрыше остаётся при вас.").withStyle(ChatFormatting.GREEN));
             }
         } else {
             if (lost) {

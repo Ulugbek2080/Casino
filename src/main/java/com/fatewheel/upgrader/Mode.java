@@ -6,7 +6,9 @@ import com.fatewheel.Stake;
 public enum Mode {
     ITEMS("Предметы"),
     TIME("Время"),
-    ORGANS("Органы");
+    ORGANS("Органы"),
+    /** Только справа: вместо цели — колесо с секторами (см. Fortune). */
+    FORTUNE("Колесо судьбы");
 
     public final String title;
 
@@ -20,6 +22,7 @@ public enum Mode {
             case ITEMS -> 0;
             case TIME -> Stake.TIME_MASK;
             case ORGANS -> Stake.BODY_MASK;
+            case FORTUNE -> 0;
         };
     }
 

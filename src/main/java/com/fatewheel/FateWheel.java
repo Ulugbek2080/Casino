@@ -1,5 +1,6 @@
 package com.fatewheel;
 
+import com.fatewheel.network.FateFortunePayload;
 import com.fatewheel.network.FateSelectPayload;
 import com.fatewheel.network.FateSyncPayload;
 import com.fatewheel.upgrader.FateUpgrader;
@@ -33,7 +34,14 @@ public final class FateWheel {
     }
 
     private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
-        var r = event.registrar("2");
+        var r = event.registrar("3");
+        r.playToClient(FateFortunePayload.TYPE, FateFortunePayload.STREAM_CODEC, (payload, context) -> context.enqueueWork(() -> {
+            ClientFlags.fortuneTier = payload.tier();
+            ClientFlags.fortunePrize = payload.prize();
+            ClientFlags.fortuneRestore = payload.restoreMask();
+            ClientFlags.fortuneFound = payload.found();
+            ClientFlags.fortuneUntil = System.currentTimeMillis() + 6000;
+        }));
         r.playToClient(FateSyncPayload.TYPE, FateSyncPayload.STREAM_CODEC, (payload, context) -> context.enqueueWork(() -> {
             ClientFlags.lostMask = payload.lostMask();
             ClientFlags.inMode = payload.inMode();
